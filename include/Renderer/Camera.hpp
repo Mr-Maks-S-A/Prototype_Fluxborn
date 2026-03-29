@@ -29,8 +29,18 @@ public:
 
     // Геттеры для позиции (пригодятся для рендеринга чанков)
     glm::vec3 GetPosition() const { return m_Position; }
+    void SetPosition(const glm::vec3& position) { m_Position = position; UpdateCameraVectors(); }
+
     glm::vec3 GetForward() const { return m_Front; }
 
+    float& GetSensitivity() { return m_MouseSensitivity; } // Возвращаем ссылку для ImGui
+    void SetSensitivity(float s) { m_MouseSensitivity = s; }
+
+    float& GetMovementSpeed() { return m_MovementSpeed; }
+    void SetMovementSpeed(float new_MovementSpeed ) { m_MovementSpeed = new_MovementSpeed; }
+
+    float& GetFOV() { return m_FOV; }
+    void SetFOV(float fov) { m_FOV = fov; }
 private:
     void UpdateCameraVectors();
 
@@ -49,5 +59,5 @@ private:
     // Настройки камеры
     float m_MovementSpeed = 5.0f;
     float m_MouseSensitivity = 0.1f;
-    float m_Zoom = 45.0f;
+    float m_FOV = 45.0f; // Начальное значение (как m_Zoom у тебя было)
 };

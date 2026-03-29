@@ -1,4 +1,6 @@
 #include "Renderer/VertexArray.hpp"
+#include "Renderer/Mesh.hpp"
+
 
 VertexArray::VertexArray() {
     glCreateVertexArrays(1, &m_RendererID);
@@ -14,13 +16,18 @@ void VertexArray::Unbind() const { glBindVertexArray(0); }
 void VertexArray::AddVertexBuffer(const std::shared_ptr<VertexBuffer>& vertexBuffer) {
     uint32_t bindingIndex = m_VertexBufferIndex++;
 
-    // Привязываем VBO к VAO на определенный индекс привязки
-    glVertexArrayVertexBuffer(m_RendererID, bindingIndex, vertexBuffer->m_RendererID, 0, 3 * sizeof(float));
+    // Шаг (stride) теперь 6 флоатов (3 pos + 3 normal)
+    glVertexArrayVertexBuffer(m_RendererID, bindingIndex, vertexBuffer->m_RendererID, 0, sizeof(Vertex));
 
-    // Описываем формат (Атрибут 0: Позиция)
+    // Атрибут 0: Позиция
     glEnableVertexArrayAttrib(m_RendererID, 0);
-    glVertexArrayAttribFormat(m_RendererID, 0, 3, GL_FLOAT, GL_FALSE, 0);
+    glVertexArrayAttribFormat(m_RendererID, 0, 3, GL_FLOAT, GL_FALSE, offsetof(Vertex, Position));
     glVertexArrayAttribBinding(m_RendererID, 0, bindingIndex);
+
+    // Атрибут 1: Нормаль
+    glEnableVertexArrayAttrib(m_RendererID, 1);
+    glVertexArrayAttribFormat(m_RendererID, 1, 3, GL_FLOAT, GL_FALSE, offsetof(Vertex, Normal));
+    glVertexArrayAttribBinding(m_RendererID, 1, bindingIndex);
 
     m_VertexBuffers.push_back(vertexBuffer);
 }

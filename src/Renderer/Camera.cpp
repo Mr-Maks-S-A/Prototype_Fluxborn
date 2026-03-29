@@ -13,7 +13,8 @@ glm::mat4 Camera::GetViewMatrix() const {
 }
 
 glm::mat4 Camera::GetProjectionMatrix(float width, float height) const {
-    return glm::perspective(glm::radians(m_Zoom), width / height, 0.1f, 1000.0f);
+    // Важно: ограничиваем FOV, чтобы не вывернуть камеру наизнанку (от 1 до 120 градусов)
+    return glm::perspective(glm::radians(m_FOV), width / height, 0.1f, 1000.0f);
 }
 
 void Camera::ProcessKeyboard(const std::string& direction, float deltaTime) {
@@ -22,6 +23,10 @@ void Camera::ProcessKeyboard(const std::string& direction, float deltaTime) {
     if (direction == "BACKWARD") m_Position -= m_Front * velocity;
     if (direction == "LEFT")     m_Position -= m_Right * velocity;
     if (direction == "RIGHT")    m_Position += m_Right * velocity;
+
+    // Добавляем вертикальное перемещение
+    if (direction == "UP")       m_Position += m_WorldUp * velocity;
+    if (direction == "DOWN")     m_Position -= m_WorldUp * velocity;
 }
 
 void Camera::ProcessMouseMovement(float xoffset, float yoffset, bool constrainPitch) {

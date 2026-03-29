@@ -11,6 +11,9 @@
 #include <GLFW/glfw3.h>
 #include <entt/entt.hpp>
 #include "Renderer/Camera.hpp"
+#include "Renderer/Shader.hpp" // Теперь подключаем здесь!
+#include "World/World.hpp"
+
 #include <string>
 #include <memory>
 
@@ -58,6 +61,8 @@ public:
     void Stop();
 
 private:
+    static void FramebufferSizeCallback(GLFWwindow* window, int width, int height);
+
     /**
      * @brief Настройка GLFW и создание контекста OpenGL 4.5 Core.
      * @internal
@@ -91,13 +96,25 @@ private:
      */
     void Shutdown();
 
+
 private:
     GLFWwindow* m_Window = nullptr; ///< Указатель на нативное окно GLFW.
     std::string m_Title;            ///< Заголовок окна.
     int m_Width, m_Height;          ///< Текущие размеры окна.
     bool m_Running = true;          ///< Флаг активности главного цикла.
+
+    glm::vec4 m_CubeColor = { 0.8f, 0.4f, 0.1f, 1.0f };
+
+    std::unique_ptr<Shader> m_TestShader;
+
+
+    bool m_FirstMouse = true;
+    float m_LastX = 0.0f;
+    float m_LastY = 0.0f;
+    bool m_CursorLocked = true;
     std::unique_ptr<Camera> m_Camera;
 
+    std::unique_ptr<World> m_World;
     /** * @brief Реестр EnTT.
      * Хранит все сущности и компоненты (ECS).
      */

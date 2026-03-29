@@ -3,7 +3,7 @@
 
 int main() {
     try {
-        Application app("Fluxborn Prototype", 1280, 720);
+        Application app("Fluxborn Prototype", 1600, 900);
         app.Run();
     } catch (const std::exception& e) {
         std::cerr << "Critical Error: " << e.what() << std::endl;
