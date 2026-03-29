@@ -10,6 +10,7 @@
 #include <vector>
 #include <memory>
 #include "FastNoiseLite.h"
+
 /**
  * @enum FaceDirection
  * @brief Направления граней блока для генерации геометрии.
@@ -31,7 +32,7 @@ enum class FaceDirection {
  */
 class Chunk {
 public:
-    static const int SIZE = 16; ///< Размер стороны чанка в блоках.
+    static const int SIZE = 32; ///< Размер стороны чанка в блоках.
 
     Chunk();
 
@@ -74,7 +75,7 @@ private:
      * @param dir Направление отрисовываемой грани.
      */
     void AddFace(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices,
-                 float x, float y, float z, FaceDirection dir);
+                 float x, float y, float z, FaceDirection dir, BlockType type);
 
     BlockType m_Blocks[SIZE][SIZE][SIZE]; ///< Массив данных о блоках чанка.
     std::unique_ptr<Mesh> m_Mesh;         ///< Сгенерированная полигональная сетка чанка.

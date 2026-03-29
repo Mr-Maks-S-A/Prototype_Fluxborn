@@ -106,6 +106,9 @@ CPMAddPackage(
     OPTIONS "ENTT_BUILD_TESTING OFF"
 )
 
+# --- STB (Image loading) ---
+add_subdirectory("${CMAKE_SOURCE_DIR}/External/stb")
+
 # --- ПОДКЛЮЧЕНИЕ ЛОКАЛЬНОГО GLAD ---
 # Это заставит CMake зайти в твою папку и выполнить твой старый CMakeLists.txt
 add_subdirectory("${CMAKE_SOURCE_DIR}/External/glad")
@@ -154,6 +157,7 @@ target_link_libraries(${PROJECT_NAME}
         glfw
         glm::glm
         EnTT::EnTT
+        stb
         glad::glad  # Используем алиас
         imgui::imgui
         ${CMAKE_DL_LIBS} # ОБЯЗАТЕЛЬНО для Wayland/GLAD

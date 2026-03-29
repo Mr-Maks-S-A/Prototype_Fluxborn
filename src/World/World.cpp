@@ -5,7 +5,7 @@
 World::World(int seed) : m_Seed(seed) {
     m_Noise.SetSeed(m_Seed);
     m_Noise.SetNoiseType(FastNoiseLite::NoiseType_Perlin);
-    m_Noise.SetFrequency(0.02f); // Настройка "плавности" ландшафта
+    m_Noise.SetFrequency(0.01f); // Настройка "плавности" ландшафта
 }
 
 
@@ -72,14 +72,24 @@ void World::GenerateChunkData(Chunk* chunk, int cx, int cz) {
             float wz = (float)(cz * Chunk::SIZE + z);
 
             float noiseVal = m_Noise.GetNoise(wx, wz);
-            // Масштабируем шум в высоту (от 1 до SIZE-1)
-            int height = static_cast<int>((noiseVal + 1.0f) * 0.5f * (Chunk::SIZE - 2)) + 1;
+            int height = static_cast<int>((noiseVal + 1.0f) * 0.5f * (Chunk::SIZE - 2)) + 2;
 
             for (int y = 0; y < Chunk::SIZE; y++) {
-                if (y < height)
-                    chunk->SetBlock(x, y, z, BlockType::Grass);
-                else
+                if (y == 0) {
+                    chunk->SetBlock(x, y, z, BlockType::Bedrock); // Самый низ
+                } else if (y < height - 2) {
+                    chunk->SetBlock(x, y, z, BlockType::Stone);   // Глубина
+                } else if (y < height - 1) {
+                    chunk->SetBlock(x, y, z, BlockType::Dirt);    // Подслой
+                } else if (y == height - 1) {
+                    // Трава или Снег в зависимости от высоты
+                    if (height > 12)
+                        chunk->SetBlock(x, y, z, BlockType::Snow);
+                    else
+                        chunk->SetBlock(x, y, z, BlockType::Grass);
+                } else {
                     chunk->SetBlock(x, y, z, BlockType::Air);
+                }
             }
         }
     }

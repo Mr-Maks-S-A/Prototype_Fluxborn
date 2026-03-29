@@ -1,21 +1,24 @@
 #version 450 core
-out vec4 FragColor;
 
-in vec3 v_Normal;
-in vec3 v_FragPos;
+layout(location = 0) out vec4 color;
+in vec2 TexCoords;
+in vec3 Normal;
 
+uniform sampler2D u_Texture;
 uniform vec4 u_Color;
+uniform float u_LightIntensity; // Новое!
+uniform vec3 u_LightDir;        // Новое!
 
 void main() {
-    // Простейший направленный свет (как будто солнце)
-    vec3 lightDir = normalize(vec3(0.5, 1.0, 0.3));
-    vec3 norm = normalize(v_Normal);
+    vec4 texColor = texture(u_Texture, TexCoords);
+    if(texColor.a < 0.1) discard;
 
-    // Ambient (фоновый свет, чтобы тени не были черными)
-    float ambient = 0.3;
+    // Расчет освещения (Lambert)
+    // max(..., 0.2) — это минимальный фоновый свет (Ambient), чтобы тени не были черными
+    float diff = max(dot(normalize(Normal), u_LightDir), 0.2);
 
-    // Diffuse (основной свет)
-    float diff = max(dot(norm, lightDir), 0.0);
+    // Применяем интенсивность к освещению
+    float finalLight = diff * u_LightIntensity;
 
-    FragColor = u_Color * (ambient + diff);
+    color = texColor * u_Color * finalLight;
 }

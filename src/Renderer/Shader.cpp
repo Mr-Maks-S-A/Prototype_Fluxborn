@@ -3,6 +3,21 @@
 #include <sstream>
 #include <iostream>
 
+
+void Shader::SetFloat(const std::string& name, float value) {
+    glUniform1f(glGetUniformLocation(m_RendererID, name.c_str()), value);
+}
+
+void Shader::SetVec3(const std::string& name, const glm::vec3& value) {
+    glUniform3f(glGetUniformLocation(m_RendererID, name.c_str()), value.x, value.y, value.z);
+}
+
+
+void Shader::SetInt(const std::string& name, int value) {
+    glUniform1i(glGetUniformLocation(m_RendererID, name.c_str()), value);
+}
+
+
 Shader::Shader(const std::string& vertexPath, const std::string& fragmentPath) {
     std::string vertexCode;
     std::string fragmentCode;

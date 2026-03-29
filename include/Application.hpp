@@ -10,6 +10,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <entt/entt.hpp>
+#include "Renderer/Texture.hpp"
 #include "Renderer/Camera.hpp"
 #include "Renderer/Shader.hpp" // Теперь подключаем здесь!
 #include "World/World.hpp"
@@ -105,8 +106,11 @@ private:
 
     glm::vec4 m_CubeColor = { 0.8f, 0.4f, 0.1f, 1.0f };
 
+    std::unique_ptr<Texture> m_BlockAtlas;
     std::unique_ptr<Shader> m_TestShader;
 
+    float m_LightIntensity = 1.0f; // Значение по умолчанию
+    glm::vec3 m_LightDir = {0.5f, 1.0f, 0.3f}; // Направление света
 
     bool m_FirstMouse = true;
     float m_LastX = 0.0f;

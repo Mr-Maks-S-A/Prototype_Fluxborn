@@ -24,6 +24,9 @@ Application::Application(const std::string& title, int width, int height)
     // 1. Сначала шейдер!
     m_TestShader = std::make_unique<Shader>("Assets/shaders/default.vert", "Assets/shaders/default.frag");
 
+    // Загружаем атлас (путь должен вести к твоему PNG с 16x16 блоками)
+    m_BlockAtlas = std::make_unique<Texture>("Assets/textures/terrain.png");
+
     // 2. Потом камера
     m_Camera = std::make_unique<Camera>(glm::vec3(0.0f, 15.0f, 30.0f));
 
@@ -96,7 +99,9 @@ void Application::InitGLFW() {
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE); // Включаем отсечение граней
-    glCullFace(GL_BACK);    // Не рисуем задние грани
+    glEnable(GL_BLEND);
+    glCullFace(GL_BACK);    // Не рисуем задние
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
 
@@ -242,12 +247,20 @@ void Application::Render() {
 
     // 2. Рендеринг 3D мира
     m_TestShader->Bind(); // Используем поле класса вместо static
+    // Биндим текстуру в 0-й слот
+    m_BlockAtlas->Bind(0);
+    // Сообщаем шейдеру, что семплер u_Texture должен брать данные из 0-го слота
+    m_TestShader->SetInt("u_Texture", 0);
+
 
     glm::mat4 view = m_Camera->GetViewMatrix();
     glm::mat4 proj = m_Camera->GetProjectionMatrix((float)m_Width, (float)m_Height);
 
+
     m_TestShader->SetMat4("u_ViewProjection", proj * view);
-    m_TestShader->SetVec4("u_Color", m_CubeColor); // Используй поле класса для цвета
+    m_TestShader->SetVec4("u_Color", m_CubeColor);
+    m_TestShader->SetFloat("u_LightIntensity", m_LightIntensity); // Передаем силу
+    m_TestShader->SetVec3("u_LightDir", glm::normalize(m_LightDir)); // И направление
 
     // Рисуем все чанки
     m_World->Render(m_TestShader.get());
@@ -316,6 +329,12 @@ void Application::Render() {
         if (ImGui::Button("Standard FOV (70)")) {
             m_Camera->SetFOV(70.0f);
         }
+
+        ImGui::SeparatorText("Texture Info");
+        ImGui::Text("Atlas: %dx%d", m_BlockAtlas->GetWidth(), m_BlockAtlas->GetHeight());
+        // Можно даже отрисовать саму текстуру в окне ImGui (нужно кастануть ID к ImTextureID)
+        ImGui::Image((void*)(intptr_t)m_BlockAtlas->GetRendererID(), ImVec2(128, 128));
+
         ImGui::SameLine();
         if (ImGui::Button("Quake Pro (110)")) {
             m_Camera->SetFOV(110.0f);
@@ -323,6 +342,10 @@ void Application::Render() {
 
         ImGui::SeparatorText("Appearance");
         ImGui::ColorEdit4("Cube Color", glm::value_ptr(m_CubeColor));
+
+        ImGui::SeparatorText("Lighting");
+        ImGui::SliderFloat("Ambient Intensity", &m_LightIntensity, 0.0f, 2.0f);
+        ImGui::SliderFloat3("Light Direction", glm::value_ptr(m_LightDir), -1.0f, 1.0f);
     }
     ImGui::End();
 
