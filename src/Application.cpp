@@ -5,6 +5,10 @@
 
 #include "Application.hpp"
 
+#include "Core/Events/EventManager.h"
+#include "Core/Events/MouseEvents.h"
+#include "Core/Events/KeyboardEvents.h"
+
 #include "Renderer/VertexArray.hpp"
 #include "Renderer/Mesh.hpp"
 #include <imgui.h>
@@ -29,6 +33,30 @@ Application::Application(const std::string& title, int width, int height)
 
     // 2. Потом камера
     m_Camera = std::make_unique<Camera>(glm::vec3(0.0f, 15.0f, 30.0f));
+    // ПОДПИСКА КАМЕРЫ НА СОБЫТИЯ
+    EventManager::getInstance().subscribe<MouseMovedEvent>([this](MouseMovedEvent& e) {
+        if (m_CursorLocked) {
+            // Рассчитываем дельту прямо здесь
+            float xoffset = e.getX() - m_LastX;
+            float yoffset = m_LastY - e.getY(); // перевернуто, так как y-координаты идут снизу вверх
+
+            m_LastX = e.getX();
+            m_LastY = e.getY();
+
+            // Защита от скачков при захвате курсора
+            if (std::abs(xoffset) < 500.0f && std::abs(yoffset) < 500.0f) {
+                m_Camera->ProcessMouseMovement(xoffset, yoffset);
+            }
+        } else {
+            // Если курсор не заблокирован, просто обновляем координаты, чтобы не было скачка при входе
+            m_LastX = e.getX();
+            m_LastY = e.getY();
+        }
+    });
+    m_Camera->InitEvents(); // ДОБАВЬ ЭТУ СТРОКУ
+
+
+
 
     int new_seed;//пускай будет забита мусором для рандомной генерации
     // 3. И только в конце мир (так как он сразу генерирует меши и требует контекст)
@@ -102,6 +130,40 @@ void Application::InitGLFW() {
     glEnable(GL_BLEND);
     glCullFace(GL_BACK);    // Не рисуем задние
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+
+    //Я просто закомментировал имена неиспользуемых переменных, например GLFWwindow* /*window*/.
+    //Для компилятора это сигнал: "Я знаю, что этот параметр тут есть, но он мне не нужен"
+    // 1. Движение мыши
+    glfwSetCursorPosCallback(m_Window, [](GLFWwindow* /*window*/, double xpos, double ypos) {
+        EventManager::getInstance().emit<MouseMovedEvent>((float)xpos, (float)ypos);
+    });
+
+    // 1.1 Скрол мыши
+    glfwSetScrollCallback(m_Window, [](GLFWwindow* /*window*/, double xoffset, double yoffset) {
+        EventManager::getInstance().emit<MouseScrolledEvent>((float)xoffset, (float)yoffset);
+    });
+
+    // 2. Клавиатура
+    glfwSetKeyCallback(m_Window, [](GLFWwindow* /*window*/, int key, int /*scancode*/, int action, int mods) {
+        auto& em = EventManager::getInstance();
+        if (action == GLFW_PRESS)
+            em.emit<KeyPressedEvent>(key, mods, false);
+        else if (action == GLFW_RELEASE)
+            em.emit<KeyReleasedEvent>(key, mods);
+        else if (action == GLFW_REPEAT)
+            em.emit<KeyPressedEvent>(key, mods, true);
+    });
+
+    // 3. Кнопки мыши
+    glfwSetMouseButtonCallback(m_Window, [](GLFWwindow* window, int button, int action, int /*mods*/) {
+        double x, y;
+        glfwGetCursorPos(window, &x, &y);
+        if (action == GLFW_PRESS)
+            EventManager::getInstance().emit<MouseButtonPressedEvent>(button, (float)x, (float)y);
+        else
+            EventManager::getInstance().emit<MouseButtonReleasedEvent>(button, (float)x, (float)y);
+    });
 }
 
 
@@ -145,6 +207,9 @@ void Application::Run() {
         float deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
 
+        // РАЗГРЕБАЕМ ОЧЕРЕДЬ СОБЫТИЙ
+        EventManager::getInstance().processQueue();
+
         ProcessInput();
         Update(deltaTime);
         Render();
@@ -183,24 +248,24 @@ void Application::ProcessInput() {
     }
 
     // 3. ОБРАБОТКА (Вращение)
-    if (m_CursorLocked) {
-        double xpos, ypos;
-        glfwGetCursorPos(m_Window, &xpos, &ypos);
-
-        // Рассчитываем дельту
-        float xoffset = (float)xpos - m_LastX;
-        float yoffset = m_LastY - (float)ypos;
-
-        // Обновляем старые координаты
-        m_LastX = (float)xpos;
-        m_LastY = (float)ypos;
-
-        // Если смещение слишком огромное (например, больше 100 пикселей за кадр),
-        // игнорируем его — это защитит от багов при переключении окон
-        if (std::abs(xoffset) < 500.0f && std::abs(yoffset) < 500.0f) {
-            m_Camera->ProcessMouseMovement(xoffset, yoffset);
-        }
-    }
+    // if (m_CursorLocked) {
+    //     double xpos, ypos;
+    //     glfwGetCursorPos(m_Window, &xpos, &ypos);
+    //
+    //     // Рассчитываем дельту
+    //     float xoffset = (float)xpos - m_LastX;
+    //     float yoffset = m_LastY - (float)ypos;
+    //
+    //     // Обновляем старые координаты
+    //     m_LastX = (float)xpos;
+    //     m_LastY = (float)ypos;
+    //
+    //     // Если смещение слишком огромное (например, больше 100 пикселей за кадр),
+    //     // игнорируем его — это защитит от багов при переключении окон
+    //     if (std::abs(xoffset) < 500.0f && std::abs(yoffset) < 500.0f) {
+    //         m_Camera->ProcessMouseMovement(xoffset, yoffset);
+    //     }
+    // }
 }
 
 /**
@@ -208,28 +273,17 @@ void Application::ProcessInput() {
  * @param deltaTime Время кадра для синхронизации скоростей.
  */
 void Application::Update(float deltaTime) {
-    // 1. Движение камеры
-    if (glfwGetKey(m_Window, GLFW_KEY_W) == GLFW_PRESS) m_Camera->ProcessKeyboard("FORWARD", deltaTime);
-    if (glfwGetKey(m_Window, GLFW_KEY_S) == GLFW_PRESS) m_Camera->ProcessKeyboard("BACKWARD", deltaTime);
-    if (glfwGetKey(m_Window, GLFW_KEY_A) == GLFW_PRESS) m_Camera->ProcessKeyboard("LEFT", deltaTime);
-    if (glfwGetKey(m_Window, GLFW_KEY_D) == GLFW_PRESS) m_Camera->ProcessKeyboard("RIGHT", deltaTime);
+    // Камера сама знает, нажаты ли клавиши, благодаря подписке
+    if (m_CursorLocked) {
+        m_Camera->OnUpdate(deltaTime);
+    }
 
-    if (glfwGetKey(m_Window, GLFW_KEY_SPACE) == GLFW_PRESS) m_Camera->ProcessKeyboard("UP", deltaTime);
-    if (glfwGetKey(m_Window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) m_Camera->ProcessKeyboard("DOWN", deltaTime);
-
-    // 2. БАЗОВАЯ КОЛЛИЗИЯ
+    // 2. БАЗОВАЯ КОЛЛИЗИЯ (оставляем здесь, так как она зависит от World)
     glm::vec3 pos = m_Camera->GetPosition();
-
-    // Получаем высоту ландшафта под камерой
-    // floor нужен для корректного индексирования блоков
     int groundHeight = m_World->GetHeightAt((int)std::floor(pos.x), (int)std::floor(pos.z));
-
-    float playerHeight = 1.8f; // Рост игрока
-    float minHoverHeight = (float)groundHeight + playerHeight;
-
-    // Простейшая проверка: если мы ниже уровня земли + рост, выталкиваем наверх
-    if (pos.y < minHoverHeight) {
-        pos.y = minHoverHeight;
+    float playerHeight = 1.8f;
+    if (pos.y < (float)groundHeight + playerHeight) {
+        pos.y = (float)groundHeight + playerHeight;
         m_Camera->SetPosition(pos);
     }
 

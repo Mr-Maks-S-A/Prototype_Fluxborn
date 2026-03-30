@@ -41,6 +41,9 @@ public:
 
     float& GetFOV() { return m_FOV; }
     void SetFOV(float fov) { m_FOV = fov; }
+
+    void InitEvents();
+    void OnUpdate(float deltaTime);
 private:
     void UpdateCameraVectors();
 
@@ -60,4 +63,7 @@ private:
     float m_MovementSpeed = 5.0f;
     float m_MouseSensitivity = 0.1f;
     float m_FOV = 45.0f; // Начальное значение (как m_Zoom у тебя было)
+
+    // флаги состояний клавиш, чтобы движение было плавным
+    bool m_Keys[1024] = { false };
 };
