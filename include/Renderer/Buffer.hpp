@@ -31,6 +31,9 @@ public:
     void Bind() const;
     void Unbind() const;
 
+    // В файле include/Renderer/Buffer.hpp внутри класса VertexBuffer
+    uint32_t GetRendererID() const { return m_RendererID; }
+
 private:
     uint32_t m_RendererID;
 };

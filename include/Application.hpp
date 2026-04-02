@@ -123,4 +123,12 @@ private:
      * Хранит все сущности и компоненты (ECS).
      */
     entt::registry m_Registry;
+
+    int m_DebugMode = 0; // 0: Standard, 1: Normals, 2: White
+
+
+    bool m_EnableGravity = false;
+    float m_VerticalVelocity = 0.0f;
+    const float GRAVITY_CONSTANT = -20.0f; // Ускорение
+    glm::vec3 m_SpawnPoint = glm::vec3(0.0f, 30.0f, 0.0f);
 };

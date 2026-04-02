@@ -10,6 +10,68 @@ Chunk::Chunk() {
                 m_Blocks[x][y][z] = BlockType::Air;
 }
 
+
+
+void Chunk::LoadMesh(MeshData&& data) {
+    // Если данных нет (пустой чанк), меш не создаем
+    if (data.vertices.empty()) return;
+
+    // Создаем Mesh (внутри glGenVertexArrays и т.д.)
+    m_Mesh = std::make_unique<Mesh>(data.vertices, data.indices);
+}
+
+
+
+Chunk::MeshData Chunk::GenerateMeshData() {
+    MeshData data;
+    // Весь твой цикл for(x,y,z) из BuildMesh переезжает сюда
+    // Вместо прямой вставки в m_Mesh, заполняем data.vertices и data.indices
+    for (int x = 0; x < SIZE; x++) {
+        for (int y = 0; y < SIZE; y++) {
+            for (int z = 0; z < SIZE; z++) {
+                BlockType type = m_Blocks[x][y][z];
+                if (type == BlockType::Air) continue;
+
+                float fx = (float)x; float fy = (float)y; float fz = (float)z;
+
+                // Верх (Y+)
+                if (IsTransparent(x, y + 1, z))
+                    AddFace(data.vertices, data.indices, fx, fy, fz, FaceDirection::Top, type);
+
+                // Низ (Y-)
+                if (IsTransparent(x, y - 1, z))
+                    AddFace(data.vertices, data.indices, fx, fy, fz, FaceDirection::Bottom, type);
+
+                // Лево (X-)
+                if (IsTransparent(x - 1, y, z))
+                    AddFace(data.vertices, data.indices, fx, fy, fz, FaceDirection::Left, type);
+
+                // Право (X+)
+                if (IsTransparent(x + 1, y, z))
+                    AddFace(data.vertices, data.indices, fx, fy, fz, FaceDirection::Right, type);
+
+                // Перед (Z+)
+                if (IsTransparent(x, y, z + 1))
+                    AddFace(data.vertices, data.indices, fx, fy, fz, FaceDirection::Front, type);
+
+                // Назад (Z-)
+                if (IsTransparent(x, y, z - 1))
+                    AddFace(data.vertices, data.indices, fx, fy, fz, FaceDirection::Back, type);
+
+                // AddFace(data.vertices, data.indices, fx, fy, fz, FaceDirection::Top, type);
+                // AddFace(data.vertices, data.indices, fx, fy, fz, FaceDirection::Bottom, type);
+                // AddFace(data.vertices, data.indices, fx, fy, fz, FaceDirection::Left, type);
+                // AddFace(data.vertices, data.indices, fx, fy, fz, FaceDirection::Right, type);
+                // AddFace(data.vertices, data.indices, fx, fy, fz, FaceDirection::Front, type);
+                // AddFace(data.vertices, data.indices, fx, fy, fz, FaceDirection::Back, type);
+            }
+        }
+    }
+    return data;
+}
+
+
+
 /**
  * @brief Отрисовывает чанк в мировых координатах.
  * @param shader Указатель на активную шейдерную программу.
@@ -43,76 +105,67 @@ void Chunk::AddFace(std::vector<Vertex>& vertices, std::vector<uint32_t>& indice
 
     uint32_t startIdx = static_cast<uint32_t>(vertices.size());
 
-    // 1. Опеределяем индекс текстуры в атласе
-    int texID = static_cast<int>(type) - 1; // Grass(1) станет 0, Dirt(2) станет 1 и т.д.
-
-    // ЛОГИКА ДЛЯ РАЗНЫХ СТОРОН (Пример для Травы)
+    // 1. Текстуры (оставляем твою логику)
+    int texID = static_cast<int>(type) - 1;
     if (type == BlockType::Grass) {
-        if (dir == FaceDirection::Top) texID = 0;    // Чистая трава
-        else if (dir == FaceDirection::Bottom) texID = 2; // Земля
-        else texID = 15; // Бок травы (если он есть в атласе на 16-й позиции)
+        if (dir == FaceDirection::Top) texID = 0;
+        else if (dir == FaceDirection::Bottom) texID = 2;
+        else texID = 15;
     }
 
-    // 2. Расчет координат в атласе 16x16
     const float step = 1.0f / 16.0f;
     float uMin = (texID % 16) * step;
-    // float vMin = (texID / 16) * step;
-
-    // ВАЖНО: Если текстуры в атласе перевернуты, используй:
     float vMin = 1.0f - ((texID / 16) + 1) * step;
-
     float uMax = uMin + step;
     float vMax = vMin + step;
 
-    // Вспомогательные смещения (без изменений)
-    float x_p = x + 0.5f; float x_m = x - 0.5f;
-    float y_p = y + 0.5f; float y_m = y - 0.5f;
-    float z_p = z + 0.5f; float z_m = z - 0.5f;
-
+    // 2. ГЕОМЕТРИЯ (Блок от x до x+1)
+    float x0 = x; float x1 = x + 1.0f;
+    float y0 = y; float y1 = y + 1.0f;
+    float z0 = z; float z1 = z + 1.0f;
 
     switch (dir) {
         case FaceDirection::Top:
-            vertices.push_back({ {x_m, y_p, z_p}, {0, 1, 0}, {uMin, vMax} });
-            vertices.push_back({ {x_p, y_p, z_p}, {0, 1, 0}, {uMax, vMax} });
-            vertices.push_back({ {x_p, y_p, z_m}, {0, 1, 0}, {uMax, vMin} });
-            vertices.push_back({ {x_m, y_p, z_m}, {0, 1, 0}, {uMin, vMin} });
+            vertices.push_back({ {x0, y1, z1}, {0, 1, 0}, {uMin, vMax} });
+            vertices.push_back({ {x1, y1, z1}, {0, 1, 0}, {uMax, vMax} });
+            vertices.push_back({ {x1, y1, z0}, {0, 1, 0}, {uMax, vMin} });
+            vertices.push_back({ {x0, y1, z0}, {0, 1, 0}, {uMin, vMin} });
             break;
         case FaceDirection::Bottom:
-            vertices.push_back({ {x_m, y_m, z_m}, {0,-1, 0}, {uMin, vMin} });
-            vertices.push_back({ {x_p, y_m, z_m}, {0,-1, 0}, {uMax, vMin} });
-            vertices.push_back({ {x_p, y_m, z_p}, {0,-1, 0}, {uMax, vMax} });
-            vertices.push_back({ {x_m, y_m, z_p}, {0,-1, 0}, {uMin, vMax} });
+            vertices.push_back({ {x0, y0, z0}, {0,-1, 0}, {uMin, vMin} });
+            vertices.push_back({ {x1, y0, z0}, {0,-1, 0}, {uMax, vMin} });
+            vertices.push_back({ {x1, y0, z1}, {0,-1, 0}, {uMax, vMax} });
+            vertices.push_back({ {x0, y0, z1}, {0,-1, 0}, {uMin, vMax} });
             break;
-        case FaceDirection::Left:
-            vertices.push_back({ {x_m, y_m, z_m}, {-1, 0, 0}, {uMin, vMin} });
-            vertices.push_back({ {x_m, y_m, z_p}, {-1, 0, 0}, {uMax, vMin} });
-            vertices.push_back({ {x_m, y_p, z_p}, {-1, 0, 0}, {uMax, vMax} });
-            vertices.push_back({ {x_m, y_p, z_m}, {-1, 0, 0}, {uMin, vMax} });
+        case FaceDirection::Left: // X-
+            vertices.push_back({ {x0, y0, z0}, {-1, 0, 0}, {uMin, vMin} });
+            vertices.push_back({ {x0, y0, z1}, {-1, 0, 0}, {uMax, vMin} });
+            vertices.push_back({ {x0, y1, z1}, {-1, 0, 0}, {uMax, vMax} });
+            vertices.push_back({ {x0, y1, z0}, {-1, 0, 0}, {uMin, vMax} });
             break;
-        case FaceDirection::Right:
-            vertices.push_back({ {x_p, y_m, z_p}, {1, 0, 0}, {uMin, vMin} });
-            vertices.push_back({ {x_p, y_m, z_m}, {1, 0, 0}, {uMax, vMin} });
-            vertices.push_back({ {x_p, y_p, z_m}, {1, 0, 0}, {uMax, vMax} });
-            vertices.push_back({ {x_p, y_p, z_p}, {1, 0, 0}, {uMin, vMax} });
+        case FaceDirection::Right: // X+
+            vertices.push_back({ {x1, y0, z1}, {1, 0, 0}, {uMin, vMin} });
+            vertices.push_back({ {x1, y0, z0}, {1, 0, 0}, {uMax, vMin} });
+            vertices.push_back({ {x1, y1, z0}, {1, 0, 0}, {uMax, vMax} });
+            vertices.push_back({ {x1, y1, z1}, {1, 0, 0}, {uMin, vMax} });
             break;
-        case FaceDirection::Front:
-            vertices.push_back({ {x_m, y_m, z_p}, {0, 0, 1}, {uMin, vMin} });
-            vertices.push_back({ {x_p, y_m, z_p}, {0, 0, 1}, {uMax, vMin} });
-            vertices.push_back({ {x_p, y_p, z_p}, {0, 0, 1}, {uMax, vMax} });
-            vertices.push_back({ {x_m, y_p, z_p}, {0, 0, 1}, {uMin, vMax} });
+        case FaceDirection::Front: // Z+
+            vertices.push_back({ {x0, y0, z1}, {0, 0, 1}, {uMin, vMin} });
+            vertices.push_back({ {x1, y0, z1}, {0, 0, 1}, {uMax, vMin} });
+            vertices.push_back({ {x1, y1, z1}, {0, 0, 1}, {uMax, vMax} });
+            vertices.push_back({ {x0, y1, z1}, {0, 0, 1}, {uMin, vMax} });
             break;
-        case FaceDirection::Back:
-            vertices.push_back({ {x_p, y_m, z_m}, {0, 0,-1}, {uMin, vMin} });
-            vertices.push_back({ {x_m, y_m, z_m}, {0, 0,-1}, {uMax, vMin} });
-            vertices.push_back({ {x_m, y_p, z_m}, {0, 0,-1}, {uMax, vMax} });
-            vertices.push_back({ {x_p, y_p, z_m}, {0, 0,-1}, {uMin, vMax} });
+        case FaceDirection::Back: // Z-
+            vertices.push_back({ {x1, y0, z0}, {0, 0,-1}, {uMin, vMin} });
+            vertices.push_back({ {x0, y0, z0}, {0, 0,-1}, {uMax, vMin} });
+            vertices.push_back({ {x0, y1, z0}, {0, 0,-1}, {uMax, vMax} });
+            vertices.push_back({ {x1, y1, z0}, {0, 0,-1}, {uMin, vMax} });
             break;
     }
 
-    // Индексы для двух треугольников грани
+    // 3. Индексы (против часовой стрелки для Cull Face)
     indices.push_back(startIdx + 0); indices.push_back(startIdx + 1); indices.push_back(startIdx + 2);
     indices.push_back(startIdx + 2); indices.push_back(startIdx + 3); indices.push_back(startIdx + 0);
-
 }
 
 

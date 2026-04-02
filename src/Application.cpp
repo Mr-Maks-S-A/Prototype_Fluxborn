@@ -61,7 +61,7 @@ Application::Application(const std::string& title, int width, int height)
     int new_seed;//пускай будет забита мусором для рандомной генерации
     // 3. И только в конце мир (так как он сразу генерирует меши и требует контекст)
     m_World = std::make_unique<World>(new_seed);
-    m_World->GenerateRegion(24);
+    m_World->GenerateRegion(16);
 }
 
 /**
@@ -281,20 +281,34 @@ void Application::ProcessInput() {
  * @param deltaTime Время кадра для синхронизации скоростей.
  */
 void Application::Update(float deltaTime) {
-    // Камера сама знает, нажаты ли клавиши, благодаря подписке
+    m_World->UpdateAsyncGeneration();
+
     if (m_CursorLocked) {
         m_Camera->OnUpdate(deltaTime);
     }
 
-    // 2. БАЗОВАЯ КОЛЛИЗИЯ (оставляем здесь, так как она зависит от World)
     glm::vec3 pos = m_Camera->GetPosition();
     int groundHeight = m_World->GetHeightAt((int)std::floor(pos.x), (int)std::floor(pos.z));
     float playerHeight = 1.8f;
-    if (pos.y < (float)groundHeight + playerHeight) {
-        pos.y = (float)groundHeight + playerHeight;
-        m_Camera->SetPosition(pos);
+    float minSafeY = (float)groundHeight + playerHeight;
+
+    if (m_EnableGravity) {
+        // Применяем ускорение свободного падения
+        m_VerticalVelocity += GRAVITY_CONSTANT * deltaTime;
+        pos.y += m_VerticalVelocity * deltaTime;
+
+        // Проверка приземления
+        if (pos.y <= minSafeY) {
+            pos.y = minSafeY;
+            m_VerticalVelocity = 0.0f; // Гасим скорость при ударе о землю
+        }
+    } else {
+        // Если гравитация выключена, оставляем старую логику "не проваливаться"
+        m_VerticalVelocity = 0.0f;
+        if (pos.y < minSafeY) pos.y = minSafeY;
     }
 
+    m_Camera->SetPosition(pos);
 }
 
 /**
@@ -317,7 +331,12 @@ void Application::Render() {
     m_BlockAtlas->Bind(0);
     // Сообщаем шейдеру, что семплер u_Texture должен брать данные из 0-го слота
     m_TestShader->SetInt("u_Texture", 0);
-
+    // ПЕРЕДАЕМ НОВЫЙ ПАРАМЕТР
+    m_TestShader->SetInt("u_DebugMode", m_DebugMode);
+    // Обязательно передаем u_Model (даже если это единичная матрица)
+    // Если у тебя меши чанков отрисовываются через m_World->Render,
+    // убедись, что внутри него для каждого чанка ставится его u_Model
+    m_TestShader->SetMat4("u_Model", glm::mat4(1.0f));
 
     glm::mat4 view = m_Camera->GetViewMatrix();
     glm::mat4 proj = m_Camera->GetProjectionMatrix((float)m_Width, (float)m_Height);
@@ -368,6 +387,46 @@ void Application::Render() {
         ImGui::BulletText("Space / L-Ctrl - Up / Down");
         ImGui::BulletText("Left Alt - Unlock Mouse");
         ImGui::BulletText("L-Click Window - Lock Mouse");
+
+        ImGui::SeparatorText("Rendering & Debug");
+
+        // Выбор режима отображения
+
+        static bool showWireframe = false;
+        if (ImGui::Checkbox("Wireframe Mode", &showWireframe)) {
+            if (showWireframe) {
+                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); // Только линии
+            } else {
+                glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); // Заливка (стандарт)
+            }
+        }
+
+        const char* items[] = { "Standard", "Normals (Colors)", "Solid White" };
+        ImGui::Combo("Render Mode", &m_DebugMode, items, IM_ARRAYSIZE(items));
+
+        // Флаг для Face Culling (поможет понять, не вывернуты ли грани наизнанку)
+        static bool cullFace = false; // так как у тебя в коде glDisable
+        if (ImGui::Checkbox("Enable Face Culling", &cullFace)) {
+            if (cullFace) glEnable(GL_CULL_FACE);
+            else glDisable(GL_CULL_FACE);
+        }
+
+
+        ImGui::SeparatorText("Physics & Spawn");
+
+        ImGui::Checkbox("Enable Gravity", &m_EnableGravity);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Включает падение персонажа под весом гравитации");
+
+        if (ImGui::Button("Respawn Player")) {
+            m_Camera->SetPosition(m_SpawnPoint);
+            m_VerticalVelocity = 0.0f;
+        }
+
+        if (ImGui::Button("Set Spawn Here")) {
+            m_SpawnPoint = m_Camera->GetPosition();
+        }
+
 
         ImGui::SeparatorText("Settings");
 

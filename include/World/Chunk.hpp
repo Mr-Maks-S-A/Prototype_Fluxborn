@@ -34,9 +34,34 @@ enum class FaceDirection {
  */
 class Chunk {
 public:
+
+    /**
+     * @struct MeshData
+     * @brief Промежуточный контейнер для данных меша перед отправкой в GPU.
+     */
+    struct MeshData {
+        std::vector<Vertex> vertices;
+        std::vector<uint32_t> indices;
+    };
+
     static const int SIZE = 32; ///< Сторона куба чанка. Всего 32,768 блоков на чанк.
 
     Chunk();
+
+
+    /**
+     * @brief Генерирует геометрию чанка в ОЗУ.
+     * @return MeshData Набор вершин и индексов. Можно вызывать в фоновом потоке.
+     */
+    MeshData GenerateMeshData();
+
+
+    /**
+     * @brief Загружает готовую геометрию в GPU.
+     * @param data Данные, полученные из GenerateMeshData.
+     * @note Вызывать ТОЛЬКО в основном потоке.
+     */
+    void LoadMesh(MeshData&& data);
 
     /**
      * @brief Жадная генерация меша.

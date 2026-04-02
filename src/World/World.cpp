@@ -1,8 +1,12 @@
 #include "World/World.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 #include <cmath>
+#include <iostream>
 
 World::World(int seed) : m_Seed(seed) {
+
+    m_Pool = std::make_unique<ThreadPool>(std::thread::hardware_concurrency() - 1);
+
     m_Noise.SetSeed(m_Seed);
     m_Noise.SetNoiseType(FastNoiseLite::NoiseType_Perlin);
     m_Noise.SetFrequency(0.01f); // Настройка "плавности" ландшафта
@@ -50,19 +54,85 @@ int World::GetHeightAt(int worldX, int worldZ) {
 
 
 
+// void World::GenerateRegion(int viewDistance) {
+//     for (int x = -viewDistance; x <= viewDistance; x++) {
+//         for (int z = -viewDistance; z <= viewDistance; z++) {
+//             if (m_Chunks.find({x, z}) != m_Chunks.end()) continue;
+//
+//             auto chunk = std::make_unique<Chunk>();
+//             chunk->SetWorldPos({x, 0, z});
+//             GenerateChunkData(chunk.get(), x, z);
+//             m_Chunks[{x, z}] = std::move(chunk);
+//         }
+//     }
+// }
+
 void World::GenerateRegion(int viewDistance) {
     for (int x = -viewDistance; x <= viewDistance; x++) {
         for (int z = -viewDistance; z <= viewDistance; z++) {
-            if (m_Chunks.find({x, z}) != m_Chunks.end()) continue;
+            auto coords = std::make_pair(x, z);
 
-            auto chunk = std::make_unique<Chunk>();
-            chunk->SetWorldPos({x, 0, z});
-            GenerateChunkData(chunk.get(), x, z);
-            m_Chunks[{x, z}] = std::move(chunk);
+            {
+                std::lock_guard<std::mutex> lock(m_LoadingMutex);
+                if (m_Chunks.count(coords) || m_LoadingChunks.count(coords)) continue;
+                m_LoadingChunks.insert(coords);
+            }
+
+            m_Pool->Enqueue([this, x, z]() {
+                auto chunk = std::make_unique<Chunk>();
+                chunk->SetWorldPos({x, 0, z});
+
+                // 1. Генерируем блоки (CPU)
+                // Замени FillChunkBlocks на GenerateChunkData (у тебя метод так называется)
+                // НО: Убери из GenerateChunkData вызов BuildMesh()!
+                this->GenerateChunkData(chunk.get(), x, z);
+
+                // 2. Генерируем вершины (CPU)
+                auto meshData = chunk->GenerateMeshData();
+
+                // 3. Отправляем в очередь на загрузку в GPU
+                {
+                    std::lock_guard<std::mutex> lock(m_FinishedMutex);
+                    m_FinishedChunks.push({std::move(chunk), std::move(meshData)});
+                }
+            });
         }
     }
 }
 
+
+void World::UpdateAsyncGeneration() {
+    int meshesPerFrame = 2; // Не больше 2 чанков за кадр, чтобы не лагало
+
+    while (meshesPerFrame > 0) {
+        PendingChunk pending;
+        {
+            std::lock_guard<std::mutex> lock(m_FinishedMutex);
+            if (m_FinishedChunks.empty()) break;
+
+            pending = std::move(m_FinishedChunks.front());
+            m_FinishedChunks.pop();
+        }
+
+        // Теперь у нас есть и чанк, и данные. Загружаем их в GPU!
+        pending.chunk->LoadMesh(std::move(pending.meshData));
+
+        auto coords = std::make_pair(pending.chunk->GetPosition().x, pending.chunk->GetPosition().z);
+
+        {
+            std::lock_guard<std::mutex> lock(m_LoadingMutex);
+            m_LoadingChunks.erase(coords);
+        }
+        {
+            std::lock_guard<std::mutex> lock(m_ChunksMutex);
+            m_Chunks[coords] = std::move(pending.chunk);
+        }
+
+        meshesPerFrame--;
+        std::cout << "Loaded chunk at " << coords.first << " " << coords.second << std::endl;
+
+    }
+}
 
 
 void World::GenerateChunkData(Chunk* chunk, int cx, int cz) {
@@ -93,7 +163,7 @@ void World::GenerateChunkData(Chunk* chunk, int cx, int cz) {
             }
         }
     }
-    chunk->BuildMesh();
+    // chunk->BuildMesh();
 }
 
 // void World::Render(Shader* shader) {
@@ -110,8 +180,8 @@ void World::GenerateChunkData(Chunk* chunk, int cx, int cz) {
 
 
 void World::Render(Shader* shader) {
+    std::lock_guard<std::mutex> lock(m_ChunksMutex); // Защищаем итерацию
     for (auto& [coords, chunk] : m_Chunks) {
-        // Вызываем Render чанка, он сам разберется с u_Model внутри
         chunk->Render(shader);
     }
 }

@@ -5,9 +5,11 @@
 
 #pragma once
 #include <map>
+#include <set>
 #include <tuple>
 #include <memory>
 #include "World/Chunk.hpp"
+#include "Core/ThreadPool.hpp"
 #include "FastNoiseLite.h"
 
 /**
@@ -48,6 +50,12 @@ public:
      */
     void Render(Shader* shader);
 
+    /**
+     * @brief Опрашивает очередь готовых данных и создает для них меши.
+     * Вызывается каждый кадр в основном цикле.
+     */
+    void UpdateAsyncGeneration();
+
 private:
     /**
      * @brief Процедурное заполнение данных блоков внутри конкретного чанка.
@@ -70,4 +78,26 @@ private:
      * @todo Заменить на flat_map или хэш-таблицу для улучшения кэш-локальности (DoD).
      */
     std::map<std::pair<int, int>, std::unique_ptr<Chunk>> m_Chunks;
+
+    // Поток для задач
+    std::unique_ptr<ThreadPool> m_Pool;
+
+
+
+    // Список координат чанков, которые сейчас находятся в процессе генерации
+    // Чтобы не заказать один и тот же чанк дважды
+    std::set<std::pair<int, int>> m_LoadingChunks;
+    std::mutex m_LoadingMutex;
+
+
+    struct PendingChunk {
+        std::unique_ptr<Chunk> chunk;
+        Chunk::MeshData meshData;
+    };
+
+    // Очередь чанков, которые уже заполнены блоками, но еще не имеют меша
+    std::mutex m_FinishedMutex;
+    std::queue<PendingChunk> m_FinishedChunks; // Очередь из пар [Объект + Данные]
+
+    std::mutex m_ChunksMutex;
 };
