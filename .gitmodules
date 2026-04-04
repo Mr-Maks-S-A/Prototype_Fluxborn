@@ -1,6 +1,6 @@
-[submodule "Cmake/CPM.cmake"]
-	path = Cmake/CPM.cmake
-	url = https://github.com/cpm-cmake/CPM.cmake
 [submodule "External/glfw"]
 	path = External/glfw
 	url = https://github.com/glfw/glfw.git
+[submodule "External/glm"]
+	path = External/glm
+	url = https://github.com/g-truc/glm.git
