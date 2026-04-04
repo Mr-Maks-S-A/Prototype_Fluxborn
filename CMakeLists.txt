@@ -47,7 +47,7 @@ add_subdirectory(External)
 
 # Слой 3: Конечное приложение (Игра)
 # Основной исполняемый файл, линкующий всё вышеперечисленное
-# add_subdirectory(Fluxborn)
+add_subdirectory(Fluxborn)
 
 
 # --- 5. ФИНАЛЬНЫЙ СТАТУС ---

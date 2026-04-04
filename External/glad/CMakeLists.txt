@@ -21,4 +21,4 @@ target_compile_options(glad
 add_library(glad::glad ALIAS glad)
 
 # Сообщаем об успешной конфигурации
-message(STATUS "GLAD library configured: ${CMAKE_CURRENT_SOURCE_DIR}")
+# message(STATUS "GLAD library configured: ${CMAKE_CURRENT_SOURCE_DIR}")
